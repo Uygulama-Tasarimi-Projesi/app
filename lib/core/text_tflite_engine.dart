@@ -1,8 +1,8 @@
-import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:flutter/services.dart';
 import 'nlp_processor.dart';
 
 class TextTfliteEngine {
-  static const String _modelPath = 'assets/models/en_iyi_metin_modeli.tflite';
+  static const platform = MethodChannel('com.example.duygu_analizi/text_model');
 
   static const List<String> emotionLabels = [
     'Mutlu', 'Nötr', 'Üzgün', 'Öfkeli', 'İğrenme', 'Korku', 'Şaşkınlık',
@@ -12,58 +12,46 @@ class TextTfliteEngine {
     '😊', '😐', '😢', '😡', '🤢', '😨', '😲',
   ];
 
-  Interpreter? _interpreter;
   final NlpProcessor _nlp = NlpProcessor();
   bool _isReady = false;
+  final int _seqLen = 50; // Python modelinde kaç ise (genelde 100)
 
   bool get isReady => _isReady;
 
   Future<bool> initialize() async {
-    await _nlp.loadVocab();
-
-    // ── Yöntem 1: Flex delegate olmadan dene (model sadece builtin ops kullanıyorsa çalışır)
-    // ── Yöntem 2: Hata alırsan modeli yeniden dönüştür (aşağıda açıklandı)
-    try {
-      final options = InterpreterOptions()..threads = 2;
-      _interpreter = await Interpreter.fromAsset(_modelPath, options: options);
-
-      final inputShape = _interpreter!.getInputTensor(0).shape;
-      final outputShape = _interpreter!.getOutputTensor(0).shape;
-      print('TextTFLite yüklendi — giriş: $inputShape, çıkış: $outputShape');
-
-      _isReady = true;
-      return true;
-    } catch (e) {
-      print('TextTFLite model yüklenemedi: $e');
-      _isReady = false;
-      return false;
+    final vocabOk = await _nlp.loadVocab();
+    if (!vocabOk) {
+      print('TextTFLite: vocab yüklenemedi, OOV modunda devam ediliyor');
     }
+    
+    // Kotlin tarafı init edildiği için burada sadece NLP'nin hazır olduğunu varsayıyoruz
+    _isReady = true;
+    return true;
   }
 
   Future<Map<String, dynamic>> classify(String rawText) async {
-    if (!_isReady || _interpreter == null) {
-      return _errorResult('Model hazır değil');
-    }
+    if (!_isReady) return _errorResult('Sistem hazır değil');
     if (rawText.trim().isEmpty) return _errorResult('Metin boş');
 
     try {
-      final inputShape = _interpreter!.getInputTensor(0).shape;
-      final seqLen = inputShape[1]; // Modelin tam olarak beklediği uzunluk
+      // Dart tarafında metni sayılara çevir (Örn: [14, 52, 1, 0, 0...])
+      final sequence = _nlp.process(rawText, _seqLen);
+
+      // Kotlin'e yolla ve çalıştır
+      final List<dynamic> result = await platform.invokeMethod('classifyText', {
+        'sequence': sequence,
+      });
+
+      // Gelen olasılıkları List<double>'a dönüştür
+      final probs = result.cast<double>();
       
-      // Sequence işlemini direkt modelin beklediği boyuta göre yap
-      final sequence = _nlp.process(rawText, seqLen);
-
-      final input = [sequence];
-      final output = List.generate(1, (_) => List<double>.filled(7, 0.0));
-      // ... (geri kalanı aynı)
-
-      _interpreter!.run(input, output);
-
-      final probs = output[0];
       int maxIdx = 0;
       double maxProb = probs[0];
       for (int i = 1; i < probs.length; i++) {
-        if (probs[i] > maxProb) { maxProb = probs[i]; maxIdx = i; }
+        if (probs[i] > maxProb) { 
+          maxProb = probs[i]; 
+          maxIdx = i; 
+        }
       }
 
       return {
@@ -76,6 +64,7 @@ class TextTfliteEngine {
         'topEmotions': _getTopEmotions(probs, 3),
       };
     } catch (e) {
+      print('Method Channel classify hatası: $e');
       return _errorResult('Analiz hatası: $e');
     }
   }
@@ -91,13 +80,17 @@ class TextTfliteEngine {
   }
 
   Map<String, dynamic> _errorResult(String message) => {
-    'success': false, 'error': message, 'label': 'Hata', 'emoji': '❓',
-    'confidence': 0.0, 'confidencePercent': 0, 'allProbabilities': {}, 'topEmotions': [],
+    'success': false,
+    'error': message,
+    'label': 'Hata',
+    'emoji': '❓',
+    'confidence': 0.0,
+    'confidencePercent': 0,
+    'allProbabilities': <String, double>{},
+    'topEmotions': <Map<String, dynamic>>[],
   };
 
   void dispose() {
-    _interpreter?.close();
-    _interpreter = null;
     _isReady = false;
   }
 }

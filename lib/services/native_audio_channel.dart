@@ -1,67 +1,114 @@
 import 'package:flutter/services.dart';
 
+/// Flutter ↔ Kotlin köprüsü.
+/// Ses kaydı iki adımda çalışır:
+///   1. startRecording() → kullanıcı konuşana kadar bekler, dosya yolunu döner
+///   2. stopRecording()  → kaydı durdurur; startRecording Future'ı çözülür
+///   3. classifyFile(filePath) → TFLite çıkarımını çalıştırır
 class NativeAudioChannel {
-  static const MethodChannel _channel = MethodChannel('duygu_analizi/audio');
+  static const MethodChannel _channel = MethodChannel('com.example.duygu_analizi/audio_channel');
 
+  /// Ses modelini assets'ten yükler. Uygulama başlangıcında çağrılır.
   Future<bool> initializeModel() async {
     try {
       final result = await _channel.invokeMethod<Map>('initializeModel');
       return result?['success'] == true;
     } catch (e) {
+      print('initializeModel hatası: $e');
       return false;
     }
   }
 
-  /// Kaydı başlatır. Tamamlandığında (kullanıcı durdurursa veya süre bitince)
-  /// filePath döner. Flutter tarafı daha sonra classifyFile çağırır.
+  /// Kaydı başlatır.
+  /// Kullanıcı [stopRecording()] çağırana kadar Future tamamlanmaz.
+  /// Tamamlandığında {'success': true, 'filePath': '...'} döner.
   Future<Map<String, dynamic>> startRecording() async {
     try {
       final result = await _channel.invokeMethod<Map>('startRecording');
-      if (result == null) return _errorResult('Sonuç alınamadı');
+      if (result == null) return _error('Sonuç alınamadı');
       if (result['success'] != true) {
-        return _errorResult(result['error'] ?? 'Kayıt başlatılamadı');
+        return _error(result['error']?.toString() ?? 'Kayıt başlatılamadı');
       }
       return {
         'success': true,
         'filePath': result['filePath'] as String,
       };
     } on PlatformException catch (e) {
-      return _errorResult('Platform hatası: ${e.message}');
+      return _error('Platform hatası: ${e.message}');
     } catch (e) {
-      return _errorResult('Kayıt hatası: $e');
+      return _error('Kayıt hatası: $e');
     }
   }
 
-  /// Kaydı durdurur. startRecording() Future'ı bu çağrıdan sonra çözülür.
+  /// Kaydı durdurur. Bu çağrıdan sonra [startRecording()] Future'ı çözülür.
   Future<void> stopRecording() async {
     try {
       await _channel.invokeMethod('stopRecording');
-    } catch (_) {}
+    } catch (e) {
+      print('stopRecording hatası: $e');
+    }
   }
 
-  /// Kaydedilen WAV dosyasını sınıflandırır.
+  /// Kaydedilmiş WAV dosyasını TFLite modeliyle sınıflandırır.
   Future<Map<String, dynamic>> classifyFile(String filePath) async {
     try {
       final result = await _channel.invokeMethod<Map>(
         'classifyFile',
         {'filePath': filePath},
       );
-      if (result == null) return _errorResult('Sonuç alınamadı');
+      if (result == null) return _error('Sonuç alınamadı');
+
+      // Güven oranını Kotlin'den okuyoruz (0.0 ile 1.0 arası)
+      final confidence = (result['confidence'] as num?)?.toDouble() ?? 0.0;
 
       return {
         'success': true,
-        'label': result['emotionLabel'] ?? 'Bilinmiyor',
-        'emoji': result['emotionEmoji'] ?? '❓',
-        'confidence': (result['confidence'] as double?) ?? 0.0,
-        'confidencePercent': result['confidencePercent'] ?? 0,
-        'allProbabilities': result['allProbabilities'] ?? {},
-        'inferenceTimeMs': result['inferenceTimeMs'] ?? 0,
-        'topEmotions': result['topEmotions'] ?? [],
+        // DÜZELTME: Kotlin tarafı "emotionLabel" yerine "label" olarak gönderiyor
+        'label': result['label'] ?? 'Bilinmiyor',
+        // DÜZELTME: Kotlin tarafı "emotionEmoji" yerine "emoji" olarak gönderiyor
+        'emoji': result['emoji'] ?? '❓',
+        'confidence': confidence,
+        // Yüzdelik değeri Dart tarafında hesaplıyoruz
+        'confidencePercent': (confidence * 100).toInt(),
+        'allProbabilities': result['allProbabilities'] ?? [],
+        // Detaylı sonuçları göstermek için yardımcı metodu çağırıyoruz
+        'topEmotions': _getTopEmotionsFromResult(result),
       };
     } on PlatformException catch (e) {
-      return _errorResult('Sınıflandırma hatası: ${e.message}');
+      return _error('Sınıflandırma hatası: ${e.message}');
     } catch (e) {
-      return _errorResult('Sınıflandırma hatası: $e');
+      return _error('Sınıflandırma hatası: $e');
+    }
+  }
+
+  /// Kotlin'den gelen List<double> formatındaki tüm olasılıkları
+  /// Dart arayüzünün anlayacağı List<Map> formatına çevirir ve en yüksek 3'ünü alır.
+  List<Map<String, dynamic>> _getTopEmotionsFromResult(Map result) {
+    try {
+      final probsList = (result['allProbabilities'] as List?)?.cast<double>() ?? [];
+      if (probsList.isEmpty) return [];
+
+      // Modelin çıkış sırasına göre etiketler ve emojiler
+      final List<String> labels = ['Mutlu', 'Nötr', 'Üzgün', 'Öfkeli', 'İğrenme', 'Korku', 'Şaşkınlık'];
+      final List<String> emojis = ['😊', '😐', '😢', '😡', '🤢', '😨', '😲'];
+
+      final indexed = List.generate(probsList.length, (i) => {
+        'idx': i,
+        'prob': probsList[i]
+      });
+      
+      // Olasılıkları büyükten küçüğe sırala
+      indexed.sort((a, b) => (b['prob'] as double).compareTo(a['prob'] as double));
+      
+      // Sadece en yüksek 3 olasılığı (Top 3) döndür
+      return indexed.take(3).map((e) => {
+        'label': labels[e['idx'] as int],
+        'emoji': emojis[e['idx'] as int],
+        'probability': e['prob'],
+      }).toList();
+    } catch (e) {
+      print('Top emotions parse hatası: $e');
+      return [];
     }
   }
 
@@ -79,14 +126,14 @@ class NativeAudioChannel {
     }
   }
 
-  Map<String, dynamic> _errorResult(String message) => {
-    'success': false,
-    'error': message,
-    'label': 'Hata',
-    'emoji': '❓',
-    'confidence': 0.0,
-    'confidencePercent': 0,
-    'allProbabilities': {},
-    'topEmotions': [],
-  };
+  Map<String, dynamic> _error(String message) => {
+        'success': false,
+        'error': message,
+        'label': 'Hata',
+        'emoji': '❓',
+        'confidence': 0.0,
+        'confidencePercent': 0,
+        'allProbabilities': [],
+        'topEmotions': <Map<String, dynamic>>[],
+      };
 }

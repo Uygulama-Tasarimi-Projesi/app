@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'screens/main_screen.dart'; // Bir önceki adımda oluşturduğumuz UI dosyası
+import 'screens/main_screen.dart';
 
 void main() {
-  // Flutter motoru ile native katman arasındaki köprülerin 
-  // güvenli bir şekilde kurulduğundan emin oluyoruz.
+  // Flutter motoru ile native katman arasındaki köprülerin
+  // güvenli kurulduğundan emin oluyoruz.
   WidgetsFlutterBinding.ensureInitialized();
-  
   runApp(const DuyguAnaliziApp());
 }
 
@@ -16,15 +15,12 @@ class DuyguAnaliziApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Duygu Analizi',
-      debugShowCheckedModeBanner: false, // Sağ üstteki "DEBUG" yazısını kaldırır
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // Psikoloji literatürüne uygun enerji ve pozitiflik teması
         primarySwatch: Colors.orange,
         primaryColor: Colors.orange,
         scaffoldBackgroundColor: Colors.grey[50],
-        fontFamily: 'Roboto', // Veya projende tercih ettiğin başka bir font
-        
-        // AppBar genel tasarımı
+        fontFamily: 'Roboto',
         appBarTheme: const AppBarTheme(
           elevation: 0,
           centerTitle: true,
@@ -36,8 +32,6 @@ class DuyguAnaliziApp extends StatelessWidget {
             letterSpacing: 0.5,
           ),
         ),
-        
-        // Butonların genel tasarımı
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.orange,
@@ -48,7 +42,6 @@ class DuyguAnaliziApp extends StatelessWidget {
           ),
         ),
       ),
-      // Uygulama açıldığında doğrudan bizim yazdığımız arayüze yönlendiriyoruz
       home: const MainScreen(),
     );
   }
