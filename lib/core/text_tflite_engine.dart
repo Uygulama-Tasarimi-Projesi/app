@@ -14,7 +14,7 @@ class TextTfliteEngine {
 
   final NlpProcessor _nlp = NlpProcessor();
   bool _isReady = false;
-  final int _seqLen = 50; // Python modelinde kaç ise (genelde 100)
+  final int _seqLen = 50;
 
   bool get isReady => _isReady;
 
@@ -37,7 +37,6 @@ class TextTfliteEngine {
       // Dart tarafında metni sayılara çevir (Örn: [14, 52, 1, 0, 0...])
       final sequence = _nlp.process(rawText, _seqLen);
 
-      // Kotlin'e yolla ve çalıştır
       final List<dynamic> result = await platform.invokeMethod('classifyText', {
         'sequence': sequence,
       });

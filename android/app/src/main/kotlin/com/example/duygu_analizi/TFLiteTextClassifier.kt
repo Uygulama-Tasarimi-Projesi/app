@@ -1,5 +1,4 @@
 package com.example.duygu_analizi
-
 import android.content.Context
 import android.util.Log
 import io.flutter.FlutterInjector
@@ -38,9 +37,6 @@ class TFLiteTextClassifier(private val context: Context) {
 
         val inputTensor = interpreter?.getInputTensor(0)
         Log.d("TFLite", "Input dtype: ${inputTensor?.dataType()}, shape: ${inputTensor?.shape()?.toList()}")
-        
-        // ÇÖZÜM: Loglar modelin FLOAT32 beklediğini söylüyor. 
-        // Gelen IntArray'i FloatArray'e çeviriyoruz.
         val floatSequence = FloatArray(sequence.size) { sequence[it].toFloat() }
         val input = Array(1) { floatSequence }
 

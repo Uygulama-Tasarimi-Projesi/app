@@ -120,16 +120,8 @@ class TFLiteAudioClassifier(private val context: Context) {
             )
         }
     }
-
-    /**
-     * WAV dosyasından PCM verisi okur.
-     * "data" chunk'ını dinamik olarak bulur — sabit 44 offset kullanmaz.
-     * Bazı WAV dosyalarında metadata ekstra header ekleyebilir (58, 60+ byte).
-     */
     private fun readWavAsPcm(wavFile: File): ShortArray {
         val bytes = wavFile.readBytes()
-
-        // "data" chunk'ını bul
         var dataStart = 44  // varsayılan, bulamazsa kullanılır
         for (i in 12 until bytes.size - 4) {
             if (bytes[i]   == 'd'.code.toByte() &&

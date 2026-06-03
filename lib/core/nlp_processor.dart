@@ -1,29 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
-
-/// Metin verilerini TFLite modeli için hazırlayan NLP işleme sınıfı.
-///
-/// pubspec.yaml'da şu asset path'lerin tanımlı olması gerekir:
-///   assets:
-///     - assets/vocab/word_index.json
-///     - assets/models/en_iyi_metin_modeli.tflite
-///     - assets/models/en_iyi_ses_modeli.tflite  ← android/app/src/main/assets/ değil!
-///
-/// Eğitim aşamasındaki ön işleme adımlarını mobil ortamda birebir uygular:
-///   1. Gürültü temizleme (URL, mention, RT, noktalama, rakam)
-///   2. Küçük harf dönüşümü (Türkçe I/İ dahil)
-///   3. Stop-words filtreleme (olumsuzluk belirteçleri korunur)
-///   4. Tokenizasyon
-///   5. Kelime → index dönüşümü (OOV = 1)
-///   6. Padding / kırpma
 class NlpProcessor {
-  // pubspec.yaml'daki assets bloğunda tanımlı olmalı
   static const String _vocabPath = 'assets/vocab/word_index.json';
 
   Map<String, int> _wordIndex = {};
   bool _isLoaded = false;
-
-  // Eğitimde kullanılan stop-words listesiyle tutarlı (olumsuzluklar hariç)
   static const Set<String> _stopWords = {
     'acaba', 'altı', 'ama', 'ancak', 'artık', 'asıl', 'aslında', 'az',
     'ba', 'bazı', 'bazıları', 'belki', 'ben', 'bende', 'beni', 'benim',
@@ -44,7 +25,6 @@ class NlpProcessor {
     'yedi', 'yer', 'yine', 'yoksa', 'zaten', 'zira',
     'size', 'onlara', 'benden', 'senden', 'bizden',
     'sizden', 'onlardan', 'benimle', 'seninle', 'onunla',
-    // NOT: 'değil', 'yok', 'asla', 'hiç' → eğitimde korundu, burada da yok
   };
 
   Future<bool> loadVocab() async {
@@ -59,14 +39,14 @@ class NlpProcessor {
       print('NlpProcessor vocab yüklenemedi: $e');
       // Vocab yüklenemezse boş sözlükle devam — tüm kelimeler OOV (1) olur
       _wordIndex = {};
-      _isLoaded = true; // Çalışmaya devam et, sadece OOV modunda
+      _isLoaded = true; 
       return false;
     }
   }
 
   bool get isLoaded => _isLoaded;
 
-  /// Ham metni → TFLite giriş dizisine dönüştürür.
+  /// Ham metni TFLite giriş dizisine dönüştürür.
   List<int> process(String rawText, int targetLength) {
     final cleaned = _cleanText(rawText);
     final tokens = _tokenize(cleaned);
@@ -74,11 +54,8 @@ class NlpProcessor {
     final indexed = _toSequence(filtered);
     return _pad(indexed, targetLength);
   }
-
-  // ── Özel adımlar ──────────────────────────────────────────────────────────
-
   String _cleanText(String text) {
-    // Türkçe büyük harf → küçük harf (I → ı, İ → i)
+    // Türkçe büyük harf, küçük harf (I → ı, İ → i)
     String result = text.replaceAll('I', 'ı').replaceAll('İ', 'i').toLowerCase();
 
     result = result.replaceAll(RegExp(r'https?://\S+|www\.\S+'), ''); // URL
@@ -97,12 +74,9 @@ class NlpProcessor {
   List<String> _tokenize(String text) =>
       text.split(' ').where((w) => w.isNotEmpty).toList();
 
-  /// Stop-words filtresi — olumsuzluk belirteçleri ('değil', 'yok', 'asla', 'hiç')
-  /// eğitimde korunduğu için burada da filtrelenmez.
   List<String> _removeStopWords(List<String> tokens) =>
       tokens.where((w) => !_stopWords.contains(w)).toList();
 
-  /// Kelime → index; bilinmeyen kelimeler için OOV = 1
   List<int> _toSequence(List<String> tokens) =>
       tokens.map((t) => _wordIndex[t] ?? 1).toList();
 

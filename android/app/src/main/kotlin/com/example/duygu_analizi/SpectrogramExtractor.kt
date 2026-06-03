@@ -22,16 +22,12 @@ class SpectrogramExtractor {
 
         val stftMagnitudes = computeSTFT(floatSamples)
         val melSpectrogram = applyMelFilterBank(stftMagnitudes)
-
-        // ✅ Eğitimle birebir aynı: her dosya kendi min/max ile normalize
-        // Python: mel = (mel - mel_min) / (mel_max - mel_min)
         val normalized = perSampleMinMaxNormalize(melSpectrogram)
 
         return resizeToTargetSize(normalized, melSpectrogram[0].size)
     }
 
-    // ── STFT ────────────────────────────────────────────────────────────────
-
+    // STFT
     private fun computeSTFT(samples: FloatArray): Array<FloatArray> {
         val numFrames   = maxOf(1, (samples.size - N_FFT) / HOP_LENGTH + 1)
         val spectrogram = Array(N_FFT / 2 + 1) { FloatArray(numFrames) }
@@ -104,15 +100,9 @@ class SpectrogramExtractor {
             len = len shl 1
         }
     }
-
-    // ── Hann pencere ────────────────────────────────────────────────────────
-
     private fun hannWindow(size: Int) = FloatArray(size) { n ->
         (0.5 * (1 - cos(2 * PI * n / (size - 1)))).toFloat()
     }
-
-    // ── Mel filtre bankası ───────────────────────────────────────────────────
-
     private fun applyMelFilterBank(stftMag: Array<FloatArray>): Array<FloatArray> {
         val numFrames = stftMag[0].size
         val melSpec   = Array(N_MELS) { FloatArray(numFrames) }
@@ -152,10 +142,6 @@ class SpectrogramExtractor {
 
     private fun hzToMel(hz: Float) = (2595 * log10(1 + hz / 700f))
     private fun melToHz(mel: Float) = (700 * (10f.pow(mel / 2595) - 1))
-
-    // ── Eğitimle birebir aynı normalizasyon ─────────────────────────────────
-    // Python kodu: mel = (mel - mel_min) / (mel_max - mel_min)
-
     private fun perSampleMinMaxNormalize(spec: Array<FloatArray>): Array<FloatArray> {
         var globalMin = Float.MAX_VALUE
         var globalMax = -Float.MAX_VALUE
@@ -175,8 +161,7 @@ class SpectrogramExtractor {
         }
     }
 
-    // ── 128x128 yeniden örnekleme ────────────────────────────────────────────
-
+    // 128x128 yeniden örnekleme
     private fun resizeToTargetSize(spec: Array<FloatArray>, numFrames: Int): FloatArray {
         val result    = FloatArray(TARGET_SIZE * TARGET_SIZE)
         val melStep   = N_MELS.toFloat()    / TARGET_SIZE

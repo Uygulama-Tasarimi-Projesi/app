@@ -31,8 +31,6 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-
-    // .tflite dosyalarını sıkıştırmadan pakete ekle (ZORUNLU)
     androidResources {
         noCompress += "tflite"
     }

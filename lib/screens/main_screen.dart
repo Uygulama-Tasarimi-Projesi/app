@@ -2,14 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/native_audio_channel.dart';
 import '../core/text_tflite_engine.dart';
 
-/// Tek ekran uygulaması.
-///
-/// Ses kaydı akışı:
-///   mikrofon'a dokun → kayıt başlar → istediği kadar konuşur →
-///   tekrar dokun → stopRecording() → WAV tamamlanır → classifyFile()
-///
-/// Metin analizi:
-///   TextField'e yaz → "Analiz Et" → TextTFLite classify()
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
 
@@ -41,7 +33,6 @@ class _MainScreenState extends State<MainScreen> {
 
   int _elapsedSeconds = 0;
 
-  // Tek dokunma kilidi — hızlı çift tıklamada çift kayıt başlamasını önler
   bool _micTapLocked = false;
 
   bool get _isBusy => _isRecording || _isClassifying || _isAnalyzingText;
@@ -114,7 +105,7 @@ class _MainScreenState extends State<MainScreen> {
       _startRecording();
     }
 
-    // 500 milisaniye sonra kilidi kaldır (Donanımsal çift tıklamaları filtreler)
+    // 500 milisaniye sonra kilidi kaldır
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         _micTapLocked = false;

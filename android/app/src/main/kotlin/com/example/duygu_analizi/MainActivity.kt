@@ -13,20 +13,17 @@ class MainActivity: FlutterActivity() {
     private var audioClassifier: TFLiteAudioClassifier? = null
     private var audioRecorder: AudioRecorder? = null
     private var recordedFile: File? = null
-    
-    // KİLİT NOKTASI BURASI: Dart tarafının beklediği sonucu, dosya kaydetme bitince göndermek üzere tutuyoruz
     private var pendingRecordResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-
-        // Sınıfları başlatıyoruz
+        
         textClassifier = TFLiteTextClassifier(context)
         audioClassifier = TFLiteAudioClassifier(context)
         audioClassifier?.initialize()
         audioRecorder = AudioRecorder(context)
 
-        // --- METİN KANALI ---
+        //METİN KANALI 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, TEXT_CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "classifyText") {
                 val inputSeq = call.argument<List<Int>>("sequence")
@@ -45,7 +42,7 @@ class MainActivity: FlutterActivity() {
             }
         }
 
-        // --- SES KANALI ---
+        // SES KANALI
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, AUDIO_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "initializeModel" -> {
@@ -59,7 +56,6 @@ class MainActivity: FlutterActivity() {
                     result.success(true)
                 }
                 "startRecording" -> {
-                    // Dart tarafındaki "await" işlemini askıya alıyoruz
                     pendingRecordResult = result 
                     
                     val fileName = "temp_audio_record.wav"
@@ -69,7 +65,6 @@ class MainActivity: FlutterActivity() {
                         outputFile = recordedFile!!,
                         onComplete = { file ->
                             println("Kayıt tamamlandı, dosya oluşturuldu: ${file.absolutePath}")
-                            // Kayıt bittiğinde ve WAV dosyası gerçekten yazıldığında Dart'a başarı dönüyoruz!
                             pendingRecordResult?.success(mapOf("success" to true, "filePath" to file.absolutePath))
                             pendingRecordResult = null
                         },
@@ -82,7 +77,6 @@ class MainActivity: FlutterActivity() {
                 }
                 "stopRecording" -> {
                     audioRecorder?.stopRecording()
-                    // Dart tarafına null dönüyoruz, asıl data onComplete içindeki pendingRecordResult'tan gidecek
                     result.success(null)
                 }
                 "classifyFile" -> {

@@ -1,14 +1,8 @@
 import 'package:flutter/services.dart';
 
-/// Flutter ↔ Kotlin köprüsü.
-/// Ses kaydı iki adımda çalışır:
-///   1. startRecording() → kullanıcı konuşana kadar bekler, dosya yolunu döner
-///   2. stopRecording()  → kaydı durdurur; startRecording Future'ı çözülür
-///   3. classifyFile(filePath) → TFLite çıkarımını çalıştırır
 class NativeAudioChannel {
   static const MethodChannel _channel = MethodChannel('com.example.duygu_analizi/audio_channel');
 
-  /// Ses modelini assets'ten yükler. Uygulama başlangıcında çağrılır.
   Future<bool> initializeModel() async {
     try {
       final result = await _channel.invokeMethod<Map>('initializeModel');
@@ -19,9 +13,6 @@ class NativeAudioChannel {
     }
   }
 
-  /// Kaydı başlatır.
-  /// Kullanıcı [stopRecording()] çağırana kadar Future tamamlanmaz.
-  /// Tamamlandığında {'success': true, 'filePath': '...'} döner.
   Future<Map<String, dynamic>> startRecording() async {
     try {
       final result = await _channel.invokeMethod<Map>('startRecording');
@@ -40,7 +31,6 @@ class NativeAudioChannel {
     }
   }
 
-  /// Kaydı durdurur. Bu çağrıdan sonra [startRecording()] Future'ı çözülür.
   Future<void> stopRecording() async {
     try {
       await _channel.invokeMethod('stopRecording');
@@ -63,15 +53,11 @@ class NativeAudioChannel {
 
       return {
         'success': true,
-        // DÜZELTME: Kotlin tarafı "emotionLabel" yerine "label" olarak gönderiyor
         'label': result['label'] ?? 'Bilinmiyor',
-        // DÜZELTME: Kotlin tarafı "emotionEmoji" yerine "emoji" olarak gönderiyor
         'emoji': result['emoji'] ?? '❓',
         'confidence': confidence,
-        // Yüzdelik değeri Dart tarafında hesaplıyoruz
         'confidencePercent': (confidence * 100).toInt(),
         'allProbabilities': result['allProbabilities'] ?? [],
-        // Detaylı sonuçları göstermek için yardımcı metodu çağırıyoruz
         'topEmotions': _getTopEmotionsFromResult(result),
       };
     } on PlatformException catch (e) {
@@ -81,8 +67,8 @@ class NativeAudioChannel {
     }
   }
 
-  /// Kotlin'den gelen List<double> formatındaki tüm olasılıkları
-  /// Dart arayüzünün anlayacağı List<Map> formatına çevirir ve en yüksek 3'ünü alır.
+  // Kotlin'den gelen List<double> formatındaki tüm olasılıkları
+  // Dart arayüzünün anlayacağı List<Map> formatına çevirir ve en yüksek 3'ünü alır.
   List<Map<String, dynamic>> _getTopEmotionsFromResult(Map result) {
     try {
       final probsList = (result['allProbabilities'] as List?)?.cast<double>() ?? [];

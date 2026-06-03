@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'screens/main_screen.dart';
 
 void main() {
-  // Flutter motoru ile native katman arasındaki köprülerin
-  // güvenli kurulduğundan emin oluyoruz.
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const DuyguAnaliziApp());
 }

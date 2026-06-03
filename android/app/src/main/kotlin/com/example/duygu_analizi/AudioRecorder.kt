@@ -1,5 +1,4 @@
 package com.example.duygu_analizi
-
 import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -21,18 +20,10 @@ class AudioRecorder(private val context: Context) {
     }
 
     private var audioRecord: AudioRecord? = null
-
-    // @Volatile: kayıt thread'i ve stopRecording() farklı thread'lerden bu flag'i okur/yazar.
-    // Olmadan JVM cache'leyebilir → stopRecording() çağrısı while döngüsüne ulaşmaz.
     @Volatile
     private var isRecording = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
-
-    /**
-     * Kaydı başlatır. Kullanıcı stopRecording() çağırana kadar devam eder.
-     * Tamamlandığında onComplete(file) main thread'de çağrılır.
-     */
     fun startRecording(
         outputFile: File,
         onComplete: (File) -> Unit,
@@ -55,7 +46,7 @@ class AudioRecorder(private val context: Context) {
                 SAMPLE_RATE,
                 CHANNEL_CONFIG,
                 AUDIO_FORMAT,
-                bufferSize * 4  // Daha büyük buffer: read() bloke olma ihtimalini azaltır
+                bufferSize * 4  // read() bloke olma ihtimalini azaltır
             )
 
             if (record.state != AudioRecord.STATE_INITIALIZED) {
@@ -69,8 +60,6 @@ class AudioRecorder(private val context: Context) {
             record.startRecording()
 
             Log.d(TAG, "Kayıt başladı")
-
-            // Kayıt thread'i — isRecording = false olana kadar veri toplar
             Thread {
                 writeAudioToFile(
                     record = record,
@@ -99,12 +88,10 @@ class AudioRecorder(private val context: Context) {
         val collectedBytes = mutableListOf<Byte>()
 
         try {
-            // @Volatile sayesinde isRecording = false anında görülür
             while (isRecording) {
                 val readCount = record.read(audioBuffer, 0, bufferSize)
                 when {
                     readCount > 0 -> {
-                        // PCM short → little-endian byte çifti
                         for (i in 0 until readCount) {
                             val s = audioBuffer[i]
                             collectedBytes.add((s.toInt() and 0xFF).toByte())
@@ -161,17 +148,12 @@ class AudioRecorder(private val context: Context) {
         }
         Log.d(TAG, "WAV kaydedildi: ${file.absolutePath} (${file.length()} byte)")
     }
-
-    /**
-     * Kaydı durdurur. writeAudioToFile döngüsü bir sonraki iterasyonda durur,
-     * WAV dosyasını yazar ve onComplete çağrılır.
-     */
     fun stopRecording() {
         if (!isRecording) return
-        isRecording = false  // @Volatile → kayıt thread'i anında görür
+        isRecording = false 
 
         try {
-            audioRecord?.stop()    // read() → ERROR_INVALID_OPERATION döndürür
+            audioRecord?.stop()  
             audioRecord?.release()
         } catch (e: Exception) {
             Log.w(TAG, "stopRecording hatası: ${e.message}")
