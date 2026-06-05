@@ -46,7 +46,7 @@ Projede iki bağımsız yapay zeka modeli modüler olarak çalışmaktadır:
    - **Başarı Oranı:** ~%88 (Doğrulama Seti)
 2. **Ses Analizi Modeli (2D-CNN):** - 128x128 boyutlar
    - **Başarı Oranı:** ~%35 (Doğrulama Seti)
-   - Geliştirme önerilerine açığız 😎
+   - Geliştirme önerilerine açığız. 😎
 
 ## Geliştiriciler
 - Şerife Nazlı Ünay
